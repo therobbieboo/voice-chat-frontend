@@ -194,8 +194,9 @@
 
     // VAD settings
     const SILENCE_THRESHOLD = 5; // Audio level below this is silence (0-255)
+    const SPEECH_THRESHOLD = 15; // Must be this loud to be considered speech (hysteresis)
     const SILENCE_DURATION = 2000; // 2 seconds of silence triggers processing
-    let lastAudioTime = 0;
+    let silenceStart = null; // Track when silence began
 
     // DOM elements
     const chatContainer = document.getElementById('chatContainer');
@@ -388,6 +389,7 @@
     function startVADMonitoring() {
       console.log('[DEBUG VAD] 🔍 Starting VAD monitoring...');
       stopVADMonitoring();
+      silenceStart = null; // Reset silence tracker
       
       if (!analyser) {
         console.log('[DEBUG VAD] ❌ No analyser available');
@@ -395,7 +397,6 @@
       }
       
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      let silenceStart = null;
       
       silenceTimer = setInterval(() => {
         if (!isRecording || isProcessing) return;
@@ -415,19 +416,19 @@
           } else {
             const silenceDuration = Date.now() - silenceStart;
             if (silenceDuration >= SILENCE_DURATION) {
-              console.log('[DEBUG VAD] ✅ Silence for 2s detected, triggering send!');
+              console.log('[DEBUG VAD] ✅✅ Silence for 2s detected, triggering send!');
               silenceStart = null;
               silenceDetected();
             }
           }
-        } else {
-          // Audio detected
+        } else if (average > SPEECH_THRESHOLD) {
+          // Clear speech detected (using hysteresis to avoid reset from quiet sounds)
           if (silenceStart) {
-            console.log('[DEBUG VAD] 🔊 Speech detected, resetting silence timer');
+            console.log('[DEBUG VAD] 🔊🔊 Clear speech detected, resetting silence timer');
           }
           silenceStart = null;
-          lastAudioTime = Date.now();
         }
+        // If between SILENCE_THRESHOLD and SPEECH_THRESHOLD, keep current state
       }, 200); // Check every 200ms
     }
 
