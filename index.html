@@ -424,10 +424,15 @@
           break;
         case 'audio':
           if (msg.data) {
+            console.log('[DEBUG 3] 🔊 Setting audio src, data length:', msg.data.length);
+            addMessage('system', `🔊 播放音頻 (${msg.data.length} bytes)`);
             const audio = document.getElementById('responseAudio');
             audio.src = 'data:audio/mp3;base64,' + msg.data;
             audio.style.display = 'block';
-            audio.play().catch(() => {});
+            audio.play().catch(err => {
+              console.error('[DEBUG] Audio play error:', err);
+              addMessage('system', `❌ 播放失敗: ${err}`);
+            });
           }
           break;
         case 'reset':
@@ -461,12 +466,12 @@
         
         // Send audio chunks immediately as they arrive (real-time)
         mediaRecorder.ondataavailable = event => {
-          console.log('Audio chunk received, size:', event.data.size);
+          console.log('Audio chunk received, MIME:', event.data.type, 'size:', event.data.size);
           if (event.data.size > 0 && ws && wsConnected) {
             const reader = new FileReader();
             reader.onload = () => {
               const base64 = reader.result.split(',')[1];
-              console.log('[DEBUG 0] 📤 Sending audio chunk to server, size:', event.data.size);
+              console.log('[DEBUG 0] 📤 Sending audio chunk, type:', mimeType, 'base64 length:', base64.length);
               ws.send(JSON.stringify({ type: 'audio', data: base64 }));
             };
             reader.readAsDataURL(event.data);
