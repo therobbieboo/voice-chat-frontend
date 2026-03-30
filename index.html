@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <title>語音對話 Demo</title>
+  <title>語音對話 - OpenAI Realtime A2A</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -43,23 +43,9 @@
       word-wrap: break-word;
     }
     
-    .message.system {
-      background: #1e3a5f;
-      color: #88c4f8;
-      font-size: 14px;
-    }
-    
-    .message.user {
-      background: #2563eb;
-      color: white;
-      margin-left: 20px;
-    }
-    
-    .message.ai {
-      background: #059669;
-      color: white;
-      margin-right: 20px;
-    }
+    .message.system { background: #1e3a5f; color: #88c4f8; font-size: 14px; }
+    .message.user { background: #2563eb; color: white; margin-left: 20px; }
+    .message.ai { background: #059669; color: white; margin-right: 20px; }
     
     .controls {
       display: flex;
@@ -78,29 +64,11 @@
       transition: all 0.2s;
     }
     
-    .call-btn {
-      background: #2563eb;
-      color: white;
-    }
-    
-    .call-btn:hover {
-      background: #1d4ed8;
-      transform: scale(1.05);
-    }
-    
-    .call-btn.recording {
-      background: #dc2626;
-      animation: pulse 1.5s infinite;
-    }
-    
-    .hangup-btn {
-      background: #6b7280;
-      color: white;
-    }
-    
-    .hangup-btn:hover {
-      background: #4b5563;
-    }
+    .call-btn { background: #2563eb; color: white; }
+    .call-btn:hover { background: #1d4ed8; transform: scale(1.05); }
+    .call-btn.recording { background: #dc2626; animation: pulse 1.5s infinite; }
+    .hangup-btn { background: #6b7280; color: white; }
+    .hangup-btn:hover { background: #4b5563; }
     
     .hidden { display: none !important; }
     
@@ -133,27 +101,15 @@
       0%, 100% { height: 10px; opacity: 0.5; }
       50% { height: 40px; opacity: 1; }
     }
-    
-    .response-audio {
-      width: 100%;
-      margin-top: 16px;
-      display: none;
-    }
-    
-    .status {
-      text-align: center;
-      color: #666;
-      font-size: 14px;
-    }
   </style>
 </head>
 <body>
-  <h1>🎙️ 語音對話</h1>
-  <p class="subtitle">即時持續語音對話 - 說完一句話後無需掛斷</p>
+  <h1>🎙️ OpenAI Realtime A2A</h1>
+  <p class="subtitle">原生語音輸入輸出，低延遲 2-3 秒</p>
   
   <div class="card">
     <div class="chat-container" id="chatContainer">
-      <div class="message system">🎙️ 點擊麥克風開始持續語音對話</div>
+      <div class="message system">🎙️ 點擊麥克風開始對話</div>
     </div>
     
     <div class="waveform hidden" id="waveform">
@@ -164,43 +120,32 @@
       <div class="wave-bar"></div>
     </div>
     
-    <div class="controls" id="callControls">
+    <div class="controls">
       <button class="call-btn" id="callBtn">🎤</button>
       <button class="hangup-btn hidden" id="hangupBtn">📴</button>
     </div>
-    
-    <div id="status" class="status"></div>
-    <audio id="responseAudio" class="response-audio" controls></audio>
   </div>
   
   <script>
-    // Voice Chat Frontend - Real-time Continuous Mode
-    // Implements VAD (Voice Activity Detection) for seamless voice conversations
-
+    // OpenAI Realtime API - Direct WebSocket A2A
     const BACKEND_URL = 'https://voice-chat-backend-production.up.railway.app';
-    const WS_URL = BACKEND_URL.replace('http', 'ws') + '/ws/voice';
-
-    // Recording state
+    
     let ws = null;
-    let wsConnected = false;
-    let isRecording = false;
+    let isConnected = false;
     let mediaRecorder = null;
     let audioContext = null;
     let analyser = null;
     let audioChunks = [];
     let silenceTimer = null;
-    let isProcessing = false; // Track if we're waiting for server response
-    let currentStream = null;
-
-    // VAD settings
-    const SILENCE_THRESHOLD = 10; // Higher = less sensitive to background noise
-    const SPEECH_THRESHOLD = 25; // Higher = requires louder sound to be considered speech
-    const SILENCE_DURATION = 1500; // 1.5 seconds of silence triggers processing (faster response)
-    let silenceStart = null; // Track when silence began
-
-    // DOM elements
+    let audioElement = null;
+    
+    const SILENCE_THRESHOLD = 10;
+    const SPEECH_THRESHOLD = 25;
+    const SILENCE_DURATION = 1500;
+    let silenceStart = null;
+    
     const chatContainer = document.getElementById('chatContainer');
-
+    
     function addMessage(type, text) {
       const msg = document.createElement('div');
       msg.className = `message ${type}`;
@@ -208,141 +153,139 @@
       chatContainer.appendChild(msg);
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
-
+    
     function clearChat() {
       chatContainer.innerHTML = '';
     }
-
-    function startCall() {
-      clearChat();
-      addMessage('system', '🔄 連接中...');
-      
-      ws = new WebSocket(WS_URL);
-      
-      ws.onopen = () => {
-        console.log('[DEBUG WS] ✅ WebSocket connected');
-        addMessage('system', '✅ 已連接，開始監聽...');
-        wsConnected = true;
-        isRecording = true;
-        isProcessing = false;
-        document.getElementById('callBtn').classList.add('recording');
-        document.getElementById('callBtn').textContent = '🎤';
-        document.getElementById('hangupBtn').classList.remove('hidden');
-        document.getElementById('waveform').classList.remove('hidden');
-        startRecording();
-      };
-      
-      ws.onmessage = (event) => {
-        try {
+    
+    async function startCall() {
+      try {
+        clearChat();
+        addMessage('system', '🔄 連接 OpenAI Realtime API...');
+        
+        // Step 1: Get ephemeral key from our backend
+        const response = await fetch(BACKEND_URL + '/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o-realtime-preview-2025-06-03',
+            voice: 'alloy'
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to get ephemeral key');
+        }
+        
+        const { client_secret } = await response.json();
+        const ephemeralKey = client_secret.value;
+        console.log('[DEBUG] ✅ Ephemeral key received');
+        addMessage('system', '✅ 已取得連線密鑰...');
+        
+        // Step 2: Connect directly to OpenAI Realtime WebSocket
+        ws = new WebSocket('wss://api.openai.com/v1/realtime/conversation', {
+          headers: {
+            'Authorization': `Bearer ${ephemeralKey}`,
+            'OpenAI-Beta': 'realtime=v1'
+          }
+        });
+        
+        ws.onopen = () => {
+          console.log('[DEBUG] 🔌 Connected to OpenAI!');
+          addMessage('system', '✅ 已連接，開始說話...');
+          isConnected = true;
+          
+          document.getElementById('callBtn').classList.add('recording');
+          document.getElementById('hangupBtn').classList.remove('hidden');
+          document.getElementById('waveform').classList.remove('hidden');
+          
+          // Configure session for Chinese voice assistant
+          ws.send(JSON.stringify({
+            type: 'session.update',
+            session: {
+              modalities: ['audio', 'text'],
+              instructions: '你是個友善的語音助理，請用繁體中文簡潔回覆。',
+              voice: 'alloy',
+              input_audio_transcription: { model: 'whisper-1' }
+            }
+          }));
+          
+          // Start audio capture
+          startAudioCapture();
+        };
+        
+        ws.onmessage = (event) => {
           const msg = JSON.parse(event.data);
-          console.log('[DEBUG WS] 📥 Received type:', msg.type);
+          console.log('[DEBUG] 📥 OpenAI:', msg.type);
           
           switch (msg.type) {
-            case 'transcription':
-              console.log('[DEBUG 1] 🎤 Transcription:', msg.text);
-              addMessage('system', `🎤 辨識: ${msg.text}`);
-              addMessage('user', `👤 ${msg.text}`);
+            case 'session.created':
+              console.log('[DEBUG] ✅ Session created');
               break;
               
-            case 'response':
-              console.log('[DEBUG 2] 🤖 LLM Response:', msg.response);
-              addMessage('system', `🤖 回覆: ${msg.response}`);
-              addMessage('ai', `🤖 ${msg.response}`);
-              break;
-              
-            case 'audio':
-              console.log('[DEBUG 3] 🔊 TTS audio received, size:', msg.data ? msg.data.length : 0);
-              if (msg.data && msg.data.length > 1000) {
-                addMessage('system', `🔊 播放音頻 (${msg.data.length} bytes)`);
-                const audio = document.getElementById('responseAudio');
-                audio.src = 'data:audio/mp3;base64,' + msg.data;
-                audio.style.display = 'block';
-                audio.play().then(() => {
-                  console.log('[DEBUG 3] 🔊 Audio playing, restarting VAD monitoring...');
-                  // Audio finished playing, restart recording cycle
-                  setTimeout(() => {
-                    isProcessing = false;
-                    if (wsConnected && isRecording) {
-                      console.log('[DEBUG VAD] 🔄 Restarting recording after audio playback');
-                      restartRecording();
-                    }
-                  }, 500);
-                }).catch(err => {
-                  console.error('[DEBUG 3] ❌ Audio play error:', err);
-                  addMessage('system', `❌ 播放失敗`);
-                  // Still restart recording on error
-                  isProcessing = false;
-                  if (wsConnected && isRecording) restartRecording();
-                });
-              } else {
-                console.error('[DEBUG 3] ❌ TTS audio too small:', msg.data ? msg.data.length : 0);
-                addMessage('system', `❌ TTS 無效`);
-                // Still restart recording on error
-                isProcessing = false;
-                if (wsConnected && isRecording) restartRecording();
+            case 'conversation.item.input_audio_transcription.completed':
+              if (msg.transcript) {
+                console.log('[DEBUG 1] 🎤 Transcription:', msg.transcript);
+                addMessage('system', `🎤 ${msg.transcript}`);
+                addMessage('user', `👤 ${msg.transcript}`);
               }
               break;
               
-            case 'reset':
-              console.log('[DEBUG WS] 🔄 Conversation reset');
+            case 'response.done':
+              if (msg.response?.output) {
+                msg.response.output.forEach(item => {
+                  if (item.content) {
+                    item.content.forEach(c => {
+                      if (c.type === 'text' && c.text) {
+                        console.log('[DEBUG 2] 🤖 LLM:', c.text);
+                        addMessage('system', `🤖 ${c.text}`);
+                        addMessage('ai', `🤖 ${c.text}`);
+                      }
+                    });
+                  }
+                });
+              }
+              break;
+              
+            case 'response.audio.delta':
+              // Audio delta - would need to accumulate and play
+              if (msg.delta) {
+                console.log('[DEBUG 3] 🔊 Audio delta:', msg.delta.substring(0, 50));
+              }
+              break;
+              
+            case 'response.audio.done':
+              console.log('[DEBUG 3] ✅ Audio done');
               break;
               
             case 'error':
-              console.error('[DEBUG WS] ❌ Error from server:', msg.message);
-              addMessage('system', `❌ 錯誤: ${msg.message}`);
-              // Restart recording after error
-              setTimeout(() => {
-                isProcessing = false;
-                if (wsConnected && isRecording) restartRecording();
-              }, 1000);
+              console.error('[DEBUG] ❌ Error:', msg.error);
+              addMessage('system', `❌ ${msg.error?.message || 'Unknown error'}`);
               break;
           }
-        } catch (e) {
-          console.error('[DEBUG WS] ❌ Failed to parse message:', e);
-        }
-      };
-      
-      ws.onerror = (error) => {
-        console.error('[DEBUG WS] ❌ WebSocket error:', error);
-        addMessage('system', '❌ 連接錯誤');
-        stopCall();
-      };
-      
-      ws.onclose = (event) => {
-        console.log('[DEBUG WS] 🔌🔌 WebSocket closed', event.code, event.reason);
-        addMessage('system', `🔌 連接已結束 (${event.code})`);
-        wsConnected = false;
-        isRecording = false;
-        document.getElementById('callBtn').classList.remove('recording');
-        document.getElementById('callBtn').textContent = '🎤';
-        document.getElementById('hangupBtn').classList.add('hidden');
-        document.getElementById('waveform').classList.add('hidden');
-        stopVADMonitoring();
-      };
-    }
-
-    function stopCall() {
-      console.log('[DEBUG] 🛑 stopCall() called');
-      isRecording = false;
-      stopVADMonitoring();
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-      }
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-      }
-      if (ws && wsConnected) {
-        ws.send(JSON.stringify({ type: 'reset' }));
-        ws.close();
-        wsConnected = false;
+        };
+        
+        ws.onerror = (err) => {
+          console.error('[DEBUG] ❌ WS error:', err);
+          addMessage('system', '❌ 連線錯誤');
+        };
+        
+        ws.onclose = () => {
+          console.log('[DEBUG] 🔌 Closed');
+          addMessage('system', '🔌 已斷線');
+          isConnected = false;
+          stopRecording();
+        };
+        
+      } catch (error) {
+        console.error('[DEBUG] ❌ Failed:', error);
+        addMessage('system', `❌ 連線失敗: ${error.message}`);
       }
     }
-
-    async function startRecording() {
+    
+    async function startAudioCapture() {
       try {
-        console.log('[DEBUG RECORD] 🎙️ Starting recording...');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        currentStream = stream;
         
         // Set up audio context for VAD
         audioContext = new AudioContext();
@@ -352,175 +295,143 @@
         analyser.smoothingTimeConstant = 0.3;
         source.connect(analyser);
         
-        // Try different audio formats for Whisper compatibility
-        const mimeTypes = ['audio/mpeg', 'audio/ogg', 'audio/webm;codecs=opus', 'audio/webm'];
-        let mimeType = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
-        console.log('[DEBUG RECORD] 📋 Using MIME type:', mimeType);
-        
+        // Set up MediaRecorder to capture audio chunks
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
         mediaRecorder = new MediaRecorder(stream, { mimeType });
         audioChunks = [];
         
-        mediaRecorder.ondataavailable = event => {
-          console.log('[DEBUG RECORD] 📦 Audio chunk received, size:', event.data.size);
+        mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             audioChunks.push(event.data);
           }
         };
         
         mediaRecorder.onstop = () => {
-          console.log('[DEBUG RECORD] 🛑 Recording stopped, chunks:', audioChunks.length);
-          stream.getTracks().forEach(track => track.stop());
+          console.log('[DEBUG] 🎤 Recording stopped, chunks:', audioChunks.length);
+          if (audioChunks.length > 0 && ws && ws.readyState === WebSocket.OPEN) {
+            // Send accumulated audio
+            const audioBlob = new Blob(audioChunks, { type: mimeType });
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64 = reader.result.split(',')[1];
+              console.log('[DEBUG] 📤 Sending audio, size:', base64.length);
+              ws.send(JSON.stringify({
+                type: 'input_audio_buffer.append',
+                audio: base64
+              }));
+              ws.send(JSON.stringify({
+                type: 'input_audio_buffer.commit',
+                type: 'conversation.item.create',
+                item: {
+                  type: 'input_audio_buffer',
+                  audio: base64
+                }
+              }));
+            };
+            reader.readAsDataURL(audioBlob);
+          }
+          audioChunks = [];
         };
         
-        mediaRecorder.start(1000); // Collect data every second
-        console.log('[DEBUG RECORD] ✅ Recording started');
-        addMessage('system', '🎙️ 開始說話...');
+        mediaRecorder.start(500); // Send every 500ms for lower latency
+        console.log('[DEBUG] 🎙️ Recording started');
         
-        // Start VAD monitoring
-        startVADMonitoring();
+        // Start VAD
+        startVAD();
         
       } catch (error) {
-        console.error('[DEBUG RECORD] ❌ Failed to start recording:', error);
-        addMessage('system', '❌ 無法訪問麥克風: ' + error.message);
+        console.error('[DEBUG] ❌ Mic error:', error);
+        addMessage('system', `❌ 無法訪問麥克風: ${error.message}`);
         stopCall();
       }
     }
-
-    function startVADMonitoring() {
-      console.log('[DEBUG VAD] 🔍 Starting VAD monitoring...');
-      stopVADMonitoring();
-      silenceStart = null; // Reset silence tracker
-      
-      if (!analyser) {
-        console.log('[DEBUG VAD] ❌ No analyser available');
-        return;
-      }
+    
+    function startVAD() {
+      console.log('[DEBUG VAD] 🔍 VAD monitoring...');
+      stopVAD();
       
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       
       silenceTimer = setInterval(() => {
-        if (!isRecording || isProcessing) return;
+        if (!isConnected) return;
         
         analyser.getByteFrequencyData(dataArray);
-        // Calculate average audio level
         const sum = dataArray.reduce((a, b) => a + b, 0);
         const average = sum / dataArray.length;
         
-        console.log('[DEBUG VAD] 📊 Audio level:', average.toFixed(1), average < SILENCE_THRESHOLD ? '(silence)' : '(speech)');
+        console.log('[DEBUG VAD] 📊 Level:', average.toFixed(1), average < SILENCE_THRESHOLD ? '(silence)' : '(speech)');
         
         if (average < SILENCE_THRESHOLD) {
-          // Silence detected
-          if (!silenceStart) {
-            silenceStart = Date.now();
-            console.log('[DEBUG VAD] 🔇 Silence started at:', new Date().toLocaleTimeString());
-          } else {
-            const silenceDuration = Date.now() - silenceStart;
-            if (silenceDuration >= SILENCE_DURATION) {
-              console.log('[DEBUG VAD] ✅✅ Silence for 2s detected, triggering send!');
-              silenceStart = null;
-              silenceDetected();
-            }
+          if (!silenceStart) silenceStart = Date.now();
+          else if (Date.now() - silenceStart >= SILENCE_DURATION) {
+            console.log('[DEBUG VAD] ✅✅ 1.5s silence - commit audio!');
+            silenceStart = null;
+            commitAudio();
           }
         } else if (average > SPEECH_THRESHOLD) {
-          // Clear speech detected (using hysteresis to avoid reset from quiet sounds)
-          if (silenceStart) {
-            console.log('[DEBUG VAD] 🔊🔊 Clear speech detected, resetting silence timer');
-          }
           silenceStart = null;
         }
-        // If between SILENCE_THRESHOLD and SPEECH_THRESHOLD, keep current state
-      }, 200); // Check every 200ms
+      }, 200);
     }
-
-    function stopVADMonitoring() {
-      if (silenceTimer) {
-        clearInterval(silenceTimer);
-        silenceTimer = null;
-        console.log('[DEBUG VAD] 🛑 VAD monitoring stopped');
-      }
-    }
-
-    function silenceDetected() {
-      if (isProcessing) {
-        console.log('[DEBUG VAD] ⏳ Already processing, skipping');
-        return;
-      }
+    
+    function commitAudio() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
       
-      console.log('[DEBUG VAD] 📤 Silence detected, preparing to send audio');
-      
-      if (audioChunks.length === 0) {
-        console.log('[DEBUG VAD] ⚠️ No audio chunks accumulated');
-        return;
-      }
-      
-      isProcessing = true;
-      
-      // Stop current recording
       if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
       }
       
-      // Get the MIME type from mediaRecorder
-      const mimeType = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
-      
-      // Combine all chunks
-      const audioBlob = new Blob(audioChunks, { type: mimeType });
-      const reader = new FileReader();
-      
-      reader.onload = () => {
-        const base64 = reader.result.split(',')[1];
-        console.log('[DEBUG VAD] 📤📤 Sending audio NOW, chunks:', audioChunks.length, 'base64 length:', base64.length);
-        addMessage('system', `📤 發送音頻 (${audioChunks.length} chunks)...`);
-        
-        if (ws && wsConnected) {
-          ws.send(JSON.stringify({ type: 'audio', data: base64, language: 'zh' }));
-          console.log('[DEBUG VAD] ✅ Audio sent, waiting for response...');
-          addMessage('system', `⏳ 等待 LLM 回應...`);
-        } else {
-          console.error('[DEBUG VAD] ❌ WS not connected!');
-          addMessage('system', `❌ WS 未連接!`);
-          isProcessing = false;
-        }
-      };
-      
-      reader.readAsDataURL(audioBlob);
-      
-      // Reset for next recording cycle
-      audioChunks = [];
-    }
-
-    function restartRecording() {
-      console.log('[DEBUG RECORD] 🔄 Restarting recording...');
-      
-      // Small delay before restarting
+      // Restart recording for next phrase
       setTimeout(() => {
-        if (isRecording && wsConnected && !isProcessing) {
-          startRecording();
+        if (isConnected) {
+          const stream = document.querySelector('video')?.srcObject || 
+                        document.querySelector('audio')?.srcObject;
+          if (stream) {
+            // Reuse existing stream
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+            mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorder.start(500);
+          }
         }
-      }, 300);
+      }, 100);
     }
-
-    // Event listeners
-    document.getElementById('callBtn').addEventListener('click', () => {
-      if (isRecording) {
-        console.log('[DEBUG] 🛑🛑 Call button clicked - STOPPING (this will cancel any pending response!)');
-        addMessage('system', '🛑 手動停止');
-        stopCall();
-      } else {
-        console.log('[DEBUG] 📞 Call button clicked - starting');
-        startCall();
+    
+    function stopVAD() {
+      if (silenceTimer) {
+        clearInterval(silenceTimer);
+        silenceTimer = null;
       }
+    }
+    
+    function stopRecording() {
+      console.log('[DEBUG] 🛑 Stopping...');
+      stopVAD();
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+      document.getElementById('callBtn').classList.remove('recording');
+      document.getElementById('callBtn').textContent = '🎤';
+      document.getElementById('hangupBtn').classList.add('hidden');
+      document.getElementById('waveform').classList.add('hidden');
+    }
+    
+    function stopCall() {
+      console.log('[DEBUG] 🛑🛑 Stop call');
+      isConnected = false;
+      stopRecording();
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+    }
+    
+    // Events
+    document.getElementById('callBtn').addEventListener('click', () => {
+      isConnected ? stopCall() : startCall();
     });
-
     document.getElementById('hangupBtn').addEventListener('click', stopCall);
-
-    // Audio element ended event - restart recording after audio finishes
-    document.getElementById('responseAudio').addEventListener('ended', () => {
-      console.log('[DEBUG] 🔊 Audio playback ended');
-    });
-
-    // Initialize
-    console.log('[DEBUG] 🚀 Voice Chat Frontend initialized');
+    
+    console.log('[DEBUG] 🚀 Ready');
   </script>
 </body>
 </html>
