@@ -308,9 +308,9 @@
         stopCall();
       };
       
-      ws.onclose = () => {
-        console.log('[DEBUG WS] 🔌 WebSocket closed');
-        addMessage('system', '🔌 連接已結束');
+      ws.onclose = (event) => {
+        console.log('[DEBUG WS] 🔌🔌 WebSocket closed', event.code, event.reason);
+        addMessage('system', `🔌 連接已結束 (${event.code})`);
         wsConnected = false;
         isRecording = false;
         document.getElementById('callBtn').classList.remove('recording');
@@ -469,13 +469,16 @@
       
       reader.onload = () => {
         const base64 = reader.result.split(',')[1];
-        console.log('[DEBUG VAD] 📤 Sending audio, chunks:', audioChunks.length, 'base64 length:', base64.length);
-        addMessage('system', `📤 發送音頻...`);
+        console.log('[DEBUG VAD] 📤📤 Sending audio NOW, chunks:', audioChunks.length, 'base64 length:', base64.length);
+        addMessage('system', `📤 發送音頻 (${audioChunks.length} chunks)...`);
         
         if (ws && wsConnected) {
           ws.send(JSON.stringify({ type: 'audio', data: base64, language: 'zh' }));
+          console.log('[DEBUG VAD] ✅ Audio sent, waiting for response...');
+          addMessage('system', `⏳ 等待 LLM 回應...`);
         } else {
-          console.error('[DEBUG VAD] ❌ WS not connected');
+          console.error('[DEBUG VAD] ❌ WS not connected!');
+          addMessage('system', `❌ WS 未連接!`);
           isProcessing = false;
         }
       };
@@ -500,7 +503,8 @@
     // Event listeners
     document.getElementById('callBtn').addEventListener('click', () => {
       if (isRecording) {
-        console.log('[DEBUG] 🛑 Call button clicked - stopping');
+        console.log('[DEBUG] 🛑🛑 Call button clicked - STOPPING (this will cancel any pending response!)');
+        addMessage('system', '🛑 手動停止');
         stopCall();
       } else {
         console.log('[DEBUG] 📞 Call button clicked - starting');
