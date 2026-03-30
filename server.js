@@ -4,9 +4,9 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CSP header to allow data: audio
+// CSP header to allow OpenAI API and WebSocket
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; media-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://voice-chat-backend-production.up.railway.app wss://voice-chat-backend-production.up.railway.app;");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; media-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://voice-chat-backend-production.up.railway.app wss://voice-chat-backend-production.up.railway.app https://api.openai.com wss://api.openai.com;");
   next();
 });
 
