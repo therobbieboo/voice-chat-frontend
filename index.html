@@ -371,7 +371,9 @@
           }
           break;
         case 'response':
-          addMessage('ai', msg.text);
+          console.log('[DEBUG 2] 🤖 LLM response received:', msg.response);
+          addMessage('system', `🤖 LLM回覆: ${msg.response}`);
+          addMessage('ai', msg.response);
           break;
         case 'audio':
           if (msg.data) {
