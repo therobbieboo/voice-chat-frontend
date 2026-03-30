@@ -183,12 +183,9 @@
         addMessage('system', '✅ 已取得連線密鑰...');
         
         // Step 2: Connect directly to OpenAI Realtime WebSocket
-        ws = new WebSocket('wss://api.openai.com/v1/realtime/conversation', {
-          headers: {
-            'Authorization': `Bearer ${ephemeralKey}`,
-            'OpenAI-Beta': 'realtime=v1'
-          }
-        });
+        // Pass ephemeral key via query parameter (browser WebSocket doesn't support custom headers)
+        const wsUrl = `wss://api.openai.com/v1/realtime/conversation?Authorization=Bearer_${encodeURIComponent(ephemeralKey)}&OpenAI-Beta=realtime=v1`;
+        ws = new WebSocket(wsUrl);
         
         ws.onopen = () => {
           console.log('[DEBUG] 🔌 Connected to OpenAI!');
