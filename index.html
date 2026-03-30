@@ -436,7 +436,7 @@
               const base64 = reader.result.split(',')[1];
               console.log('[DEBUG 0] 📤 Sending complete audio, type:', mimeType, 'base64 length:', base64.length);
               addMessage('system', `🎤 錄音結束，發送中...`);
-              ws.send(JSON.stringify({ type: 'audio', data: base64, language: 'zh-TW' }));
+              ws.send(JSON.stringify({ type: 'audio', data: base64, language: 'zh' }));
             };
             reader.readAsDataURL(audioBlob);
           } else {
