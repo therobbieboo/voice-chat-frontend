@@ -348,9 +348,27 @@
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          console.log('WS received type:', msg.type);
-          console.log('WS msg.text:', msg.text);
-          console.log('WS msg.response:', msg.response ? msg.response.substring(0, 50) : 'undefined');
+          console.log('[DEBUG] WS received type:', msg.type);
+          
+          // DEBUG 1: Show transcription result
+          if (msg.type === 'transcription') {
+            console.log('[DEBUG 1] 🎤 Transcription result:', msg.text);
+          }
+          
+          // DEBUG 2: Show LLM response
+          if (msg.type === 'response') {
+            console.log('[DEBUG 2] 🤖 LLM response:', msg.response);
+          }
+          
+          // DEBUG 3: Show TTS audio received
+          if (msg.type === 'audio') {
+            console.log('[DEBUG 3] 🔊 TTS audio received, length:', msg.data ? msg.data.length : 0);
+          }
+          
+          if (msg.type === 'error') {
+            console.error('[DEBUG] ❌ Error from server:', msg.message);
+          }
+          
           handleWsMessage(msg);
         } catch (e) {
           console.error('Failed to parse WebSocket message:', e);
@@ -445,10 +463,12 @@
           stream.getTracks().forEach(track => track.stop());
           
           if (audioChunks.length > 0 && ws && wsConnected) {
+            console.log('[DEBUG 0] 🎤 Audio input received, chunks:', audioChunks.length);
             const audioBlob = new Blob(audioChunks, { type: mimeType });
             const reader = new FileReader();
             reader.onload = () => {
               const base64 = reader.result.split(',')[1];
+              console.log('[DEBUG 0] 📤 Sending audio to server, base64 length:', base64.length);
               ws.send(JSON.stringify({ type: 'audio', data: base64 }));
             };
             reader.readAsDataURL(audioBlob);
