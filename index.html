@@ -247,30 +247,8 @@
   <p class="subtitle">選擇模式：單次對話 或 持續通話</p>
   
   <div class="card">
-    <div class="api-section">
-      <input type="text" id="backendUrl" placeholder="後端 URL" value="https://voice-chat-backend-production.up.railway.app">
-    </div>
-    
-    <div class="mode-toggle">
-      <button class="mode-btn" id="singleModeBtn" onclick="setMode('single')">單次對話</button>
-      <button class="mode-btn active" id="callModeBtn" onclick="setMode('call')">持續通話</button>
-    </div>
-    
-    <div class="waveform hidden" id="waveform">
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-    </div>
-    
     <div class="chat-container" id="chatContainer">
-      <div class="message system">系統就緒，選擇「持續通話」模式開始語音對話</div>
-    </div>
-    
-    <div class="controls" id="singleControls" style="display:none;">
-      <input type="text" class="text-input" id="textInput" placeholder="輸入文字訊息..." onkeypress="handleKeyPress(event)">
-      <button class="send-btn" id="sendBtn" onclick="sendMessage()">發送</button>
+      <div class="message system">🎙️ 點擊麥克風開始語音對話</div>
     </div>
     
     <div class="controls" id="callControls">
@@ -280,26 +258,6 @@
     
     <div id="status" class="status"></div>
     <audio id="responseAudio" class="response-audio" controls></audio>
-  </div>
-  
-  <div class="settings">
-    <label>對話模型：</label>
-    <select id="provider">
-      <option value="gemini">Gemini</option>
-      <option value="minimax">MiniMax</option>
-      <option value="openai">OpenAI</option>
-    </select>
-    <label>語音：</label>
-    <select id="voice">
-      <option value="Wise_Woman">Wise Woman (知性女)</option>
-      <option value="Friendly_Person">Friendly Person (友善女)</option>
-      <option value="Calm_Woman">Calm Woman (溫柔女)</option>
-      <option value="Lively_Girl">Lively Girl (活潑女)</option>
-      <option value="Deep_Voice_Man">Deep Voice Man (低沉男)</option>
-      <option value="Young_Knight">Young Knight (陽光男)</option>
-      <option value="Determined_Man">Determined Man (堅定男)</option>
-      <option value="Casual_Guy">Casual Guy (休閒男)</option>
-    </select>
   </div>
 
   <script>
@@ -478,7 +436,7 @@
             reader.onload = () => {
               const base64 = reader.result.split(',')[1];
               console.log('[DEBUG 0] 📤 Sending audio chunk, type:', mimeType, 'base64 length:', base64.length);
-              ws.send(JSON.stringify({ type: 'audio', data: base64 }));
+              ws.send(JSON.stringify({ type: 'audio', data: base64, language: 'zh-TW' }));
             };
             reader.readAsDataURL(event.data);
           }
