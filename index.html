@@ -418,12 +418,15 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         
-        // Prefer ogg for Whisper compatibility, fallback to webm
-        let mimeType = 'audio/ogg';
+        // Prefer mpeg (MP3) for Whisper compatibility, fallback to ogg/webm
+        let mimeType = 'audio/mpeg';
         if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'audio/webm;codecs=opus';
+          mimeType = 'audio/ogg';
           if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'audio/webm';
+            mimeType = 'audio/webm;codecs=opus';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = 'audio/webm';
+            }
           }
         }
         
