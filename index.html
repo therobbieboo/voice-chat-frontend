@@ -193,9 +193,9 @@
     let currentStream = null;
 
     // VAD settings
-    const SILENCE_THRESHOLD = 5; // Audio level below this is silence (0-255)
-    const SPEECH_THRESHOLD = 15; // Must be this loud to be considered speech (hysteresis)
-    const SILENCE_DURATION = 2000; // 2 seconds of silence triggers processing
+    const SILENCE_THRESHOLD = 10; // Higher = less sensitive to background noise
+    const SPEECH_THRESHOLD = 25; // Higher = requires louder sound to be considered speech
+    const SILENCE_DURATION = 1500; // 1.5 seconds of silence triggers processing (faster response)
     let silenceStart = null; // Track when silence began
 
     // DOM elements
