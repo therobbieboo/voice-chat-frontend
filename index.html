@@ -353,20 +353,24 @@
           // DEBUG 1: Show transcription result
           if (msg.type === 'transcription') {
             console.log('[DEBUG 1] 🎤 Transcription result:', msg.text);
+            addMessage('system', `🎤 辨識: ${msg.text}`);
           }
           
           // DEBUG 2: Show LLM response
           if (msg.type === 'response') {
             console.log('[DEBUG 2] 🤖 LLM response:', msg.response);
+            addMessage('system', `🤖 LLM回覆: ${msg.response}`);
           }
           
           // DEBUG 3: Show TTS audio received
           if (msg.type === 'audio') {
             console.log('[DEBUG 3] 🔊 TTS audio received, length:', msg.data ? msg.data.length : 0);
+            addMessage('system', `🔊 TTS音頻收到 (${msg.data ? msg.data.length : 0} bytes)`);
           }
           
           if (msg.type === 'error') {
             console.error('[DEBUG] ❌ Error from server:', msg.message);
+            addMessage('system', `❌ 錯誤: ${msg.message}`);
           }
           
           handleWsMessage(msg);
@@ -464,6 +468,7 @@
           
           if (audioChunks.length > 0 && ws && wsConnected) {
             console.log('[DEBUG 0] 🎤 Audio input received, chunks:', audioChunks.length);
+            addMessage('system', `🎤 音頻輸入: ${audioChunks.length} chunks`);
             const audioBlob = new Blob(audioChunks, { type: mimeType });
             const reader = new FileReader();
             reader.onload = () => {
