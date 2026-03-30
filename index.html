@@ -398,15 +398,14 @@
     }
     
     function stopCall() {
+      console.log('[DEBUG] stopCall() called, isRecording:', isRecording);
       if (mediaRecorder && isRecording) {
+        console.log('[DEBUG] Calling mediaRecorder.stop()');
         mediaRecorder.stop();
+      } else {
+        console.log('[DEBUG] mediaRecorder not recording or already stopped');
       }
-      if (ws && wsConnected) {
-        ws.send(JSON.stringify({ type: 'reset' }));
-        ws.close();
-      }
-      isRecording = false;
-      wsConnected = false;
+      // Don't close ws yet - wait for onstop to send audio first
     }
     
     function handleWsMessage(msg) {
@@ -464,6 +463,7 @@
         };
         
         mediaRecorder.onstop = () => {
+          console.log('[DEBUG] onstop called, audioChunks:', audioChunks.length);
           stream.getTracks().forEach(track => track.stop());
           
           if (audioChunks.length > 0 && ws && wsConnected) {
@@ -475,8 +475,17 @@
               const base64 = reader.result.split(',')[1];
               console.log('[DEBUG 0] 📤 Sending audio to server, base64 length:', base64.length);
               ws.send(JSON.stringify({ type: 'audio', data: base64 }));
+              // Close ws after a delay to allow response
+              setTimeout(() => {
+                ws.send(JSON.stringify({ type: 'reset' }));
+                ws.close();
+                console.log('[DEBUG] WS closed after sending audio');
+              }, 500);
             };
             reader.readAsDataURL(audioBlob);
+          } else {
+            console.log('[DEBUG] onstop: no audio chunks or ws not connected');
+            if (ws) ws.close();
           }
         };
         
