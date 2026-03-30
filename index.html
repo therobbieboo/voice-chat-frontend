@@ -424,15 +424,21 @@
           break;
         case 'audio':
           if (msg.data) {
-            console.log('[DEBUG 3] 🔊 Setting audio src, data length:', msg.data.length);
-            addMessage('system', `🔊 播放音頻 (${msg.data.length} bytes)`);
-            const audio = document.getElementById('responseAudio');
-            audio.src = 'data:audio/mp3;base64,' + msg.data;
-            audio.style.display = 'block';
-            audio.play().catch(err => {
-              console.error('[DEBUG] Audio play error:', err);
-              addMessage('system', `❌ 播放失敗: ${err}`);
-            });
+            console.log('[DEBUG 3] 🔊 TTS audio received, data length:', msg.data.length);
+            // Only play if audio is large enough (valid audio should be several KB minimum)
+            if (msg.data.length > 1000) {
+              addMessage('system', `🔊 播放音頻 (${msg.data.length} bytes)`);
+              const audio = document.getElementById('responseAudio');
+              audio.src = 'data:audio/mp3;base64,' + msg.data;
+              audio.style.display = 'block';
+              audio.play().catch(err => {
+                console.error('[DEBUG] Audio play error:', err);
+                addMessage('system', `❌ 播放失敗: ${err}`);
+              });
+            } else {
+              console.error('[DEBUG] Audio data too small, likely invalid:', msg.data.substring(0, 100));
+              addMessage('system', `❌ TTS 無效音頻 (${msg.data.length} bytes，可能是文字太短或語言不支援)`);
+            }
           }
           break;
         case 'reset':
