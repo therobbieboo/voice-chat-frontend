@@ -268,28 +268,16 @@
     let audioChunks = [];
     let wsConnected = false;
     
-    function setMode(newMode) {
-      mode = newMode;
-      document.getElementById('singleModeBtn').classList.toggle('active', mode === 'single');
-      document.getElementById('callModeBtn').classList.toggle('active', mode === 'call');
-      document.getElementById('singleControls').style.display = mode === 'single' ? 'flex' : 'none';
-      document.getElementById('callControls').style.display = mode === 'call' ? 'flex' : 'none';
-      document.getElementById('waveform').classList.add('hidden');
-      
-      if (mode === 'call' && isRecording) {
-        stopCall();
-      }
-    }
+    // Backend URL (fixed)
+    const BACKEND_URL = 'https://voice-chat-backend-production.up.railway.app';
+    const WS_URL = BACKEND_URL.replace('http', 'ws') + '/ws/voice';
     
     // ============ CALL MODE (WebSocket) ============
     
     function startCall() {
-      const backendUrl = document.getElementById('backendUrl').value.trim();
-      const wsUrl = backendUrl.replace('http', 'ws') + '/ws/voice';
-      
       addMessage('system', '連接中...');
       
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(WS_URL);
       
       ws.onopen = () => {
         console.log('WebSocket connected');
@@ -555,7 +543,7 @@
     }
     
     // Initialize
-    setMode('call');
+    // Call mode starts when user clicks microphone
   </script>
 </body>
 </html>
