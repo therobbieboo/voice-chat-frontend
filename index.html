@@ -398,14 +398,18 @@
     }
     
     function stopCall() {
-      console.log('[DEBUG] stopCall() called, isRecording:', isRecording);
+      console.log('[DEBUG] stopCall() called');
       if (mediaRecorder && isRecording) {
-        console.log('[DEBUG] Calling mediaRecorder.stop()');
         mediaRecorder.stop();
-      } else {
-        console.log('[DEBUG] mediaRecorder not recording or already stopped');
       }
-      // Don't close ws yet - wait for onstop to send audio first
+      // Close ws after a delay to allow any final audio to be sent and response received
+      setTimeout(() => {
+        if (ws) {
+          ws.send(JSON.stringify({ type: 'reset' }));
+          ws.close();
+          console.log('[DEBUG] WS closed');
+        }
+      }, 3000);
     }
     
     function handleWsMessage(msg) {
@@ -455,38 +459,26 @@
         mediaRecorder = new MediaRecorder(stream, { mimeType });
         audioChunks = [];
         
+        // Send audio chunks immediately as they arrive (real-time)
         mediaRecorder.ondataavailable = event => {
           console.log('Audio chunk received, size:', event.data.size);
-          if (event.data.size > 0) {
-            audioChunks.push(event.data);
-          }
-        };
-        
-        mediaRecorder.onstop = () => {
-          console.log('[DEBUG] onstop called, audioChunks:', audioChunks.length);
-          stream.getTracks().forEach(track => track.stop());
-          
-          if (audioChunks.length > 0 && ws && wsConnected) {
-            console.log('[DEBUG 0] 🎤 Audio input received, chunks:', audioChunks.length);
-            addMessage('system', `🎤 音頻輸入: ${audioChunks.length} chunks`);
-            const audioBlob = new Blob(audioChunks, { type: mimeType });
+          if (event.data.size > 0 && ws && wsConnected) {
             const reader = new FileReader();
             reader.onload = () => {
               const base64 = reader.result.split(',')[1];
-              console.log('[DEBUG 0] 📤 Sending audio to server, base64 length:', base64.length);
+              console.log('[DEBUG 0] 📤 Sending audio chunk to server, size:', event.data.size);
               ws.send(JSON.stringify({ type: 'audio', data: base64 }));
-              // Close ws after a delay to allow response
-              setTimeout(() => {
-                ws.send(JSON.stringify({ type: 'reset' }));
-                ws.close();
-                console.log('[DEBUG] WS closed after sending audio');
-              }, 500);
             };
-            reader.readAsDataURL(audioBlob);
-          } else {
-            console.log('[DEBUG] onstop: no audio chunks or ws not connected');
-            if (ws) ws.close();
+            reader.readAsDataURL(event.data);
           }
+        };
+        
+        // On stop, just clean up - audio already sent incrementally
+        mediaRecorder.onstop = () => {
+          console.log('[DEBUG] Recording stopped');
+          stream.getTracks().forEach(track => track.stop());
+          addMessage('system', `🎤 錄音結束，等待回覆...`);
+          // Don't close ws yet - wait for server response
         };
         
         mediaRecorder.start(1000); // Collect data every second
