@@ -351,19 +351,16 @@
       };
     }
     
+    // Track if we've received all responses
+    let expectResponse = false;
+    
     function stopCall() {
       console.log('[DEBUG] stopCall() called');
       if (mediaRecorder && isRecording) {
         mediaRecorder.stop();
       }
-      // Close ws after a delay to allow any final audio to be sent and response received
-      setTimeout(() => {
-        if (ws) {
-          ws.send(JSON.stringify({ type: 'reset' }));
-          ws.close();
-          console.log('[DEBUG] WS closed');
-        }
-      }, 3000);
+      // Don't close WS yet - wait for LLM response and audio
+      // WS will close naturally when server sends all responses
     }
     
     function handleWsMessage(msg) {
@@ -389,9 +386,18 @@
                 console.error('[DEBUG] Audio play error:', err);
                 addMessage('system', `❌ 播放失敗: ${err}`);
               });
+              // Close WS after playing audio
+              setTimeout(() => {
+                if (ws) {
+                  ws.send(JSON.stringify({ type: 'reset' }));
+                  ws.close();
+                  console.log('[DEBUG] WS closed after audio played');
+                }
+              }, 2000);
             } else {
               console.error('[DEBUG] Audio data too small, likely invalid:', msg.data.substring(0, 100));
               addMessage('system', `❌ TTS 無效音頻 (${msg.data.length} bytes，可能是文字太短或語言不支援)`);
+              if (ws) ws.close();
             }
           }
           break;
